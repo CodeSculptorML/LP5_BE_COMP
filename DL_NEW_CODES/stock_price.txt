@@ -1,0 +1,66 @@
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+import matplotlib.pyplot as plt
+
+# Load the dataset
+df = pd.read_csv('google.csv')
+
+# Remove commas from the 'Close' column
+df['Close'] = df['Close'].str.replace(',', '')
+
+# Preprocess the data
+scaler = MinMaxScaler(feature_range=(0, 1))
+df['Close'] = scaler.fit_transform(np.array(df['Close']).reshape(-1, 1))
+
+# Split data into train and test sets
+train_size = int(len(df) * 0.8)
+train_data, test_data = df.iloc[:train_size], df.iloc[train_size:]
+
+def creat_seq(data,time=6):
+    x=[]
+    y=[]
+    for i in range(len(data)-time):
+        x.append(data[i:i+time,0])
+        y.append(data[i+time,0])
+    return np.array(x),np.array(y)
+
+x_train, y_train = creat_seq(train_data['Close'].values.reshape(-1, 1))
+
+xtest,ytest=creat_seq(test_data['Close'].values.reshape(-1,1))
+
+model=Sequential()
+from tensorflow.keras.layers import Dense, LSTM
+model.add(LSTM(units=50, return_sequences=True ,input_shape=(6,1)))
+model.add(LSTM(units=50))
+model.add(Dense(units=1))
+model.summary
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+# Train the model
+model.fit(x_train, y_train, epochs=50, batch_size=32)
+
+# Evaluate the model
+train_loss = model.evaluate(x_train, y_train, verbose=0)
+test_loss = model.evaluate(xtest, ytest, verbose=0)
+print('Train Loss:', train_loss)
+print('Test Loss:', test_loss)
+
+# Make predictions
+train_predictions = model.predict(x_train)
+test_predictions = model.predict(xtest)
+
+# Inverse transform the predictions
+train_predictions = scaler.inverse_transform(train_predictions)
+test_predictions = scaler.inverse_transform(test_predictions)
+
+##visualize the prediction and real price
+plt.plot(test_data, color = 'red', label = 'Real price')
+plt.plot(test_predictions,color='blue',label='Predicted price')
+plt.title('Google price prediction')
+plt.xlabel('Time')
+plt.ylabel('Price')
+plt.legend()
+plt.show()
